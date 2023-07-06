@@ -5,6 +5,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
+// TODO(luca) clone can be unsafe if two instances try to write to the same file
+#[derive(Clone)]
 pub struct FuelClient {
     pub url: String,
     pub cache_path: PathBuf,
@@ -41,7 +43,6 @@ impl FuelClient {
                 break models;
             };
             models.append(&mut fetched_models);
-            dbg!(&models);
             page += 1;
         };
         if !models.is_empty() {
