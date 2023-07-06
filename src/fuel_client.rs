@@ -1,15 +1,14 @@
 use futures_lite::future;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
-use itertools::Itertools;
 
 pub struct FuelClient {
     pub url: String,
     pub cache_path: PathBuf,
     pub models: Option<Vec<FuelModel>>,
-    pub owners: Option<Vec<String>>,
 }
 
 impl Default for FuelClient {
@@ -21,7 +20,6 @@ impl Default for FuelClient {
                 .ok()
                 .and_then(|b| serde_json::de::from_slice::<Vec<FuelModel>>(&b).ok()),
             cache_path,
-            owners: None,
         }
     }
 }
@@ -101,8 +99,12 @@ impl FuelClient {
     }
 
     // Filtering functions, return cache filtered based on criteria
-    pub fn models_by_owner(&self, owner: &str) -> Option<Vec<FuelModel>> {
-        let models = self.models.as_ref()?;
+    pub fn models_by_owner(
+        &self,
+        models: Option<&Vec<FuelModel>>,
+        owner: &str,
+    ) -> Option<Vec<FuelModel>> {
+        let models = models.or_else(|| self.models.as_ref())?;
         Some(
             models
                 .iter()
@@ -112,29 +114,51 @@ impl FuelClient {
         )
     }
 
-    pub fn get_owners(&mut self) -> Option<Vec<String>> {
+    pub fn get_owners(&self) -> Option<Vec<String>> {
         let models = self.models.as_ref()?;
-        self.owners =
-            Some(
-                models
-                    .iter()
-                    .unique_by(|model| &model.owner)
-                    .map(|model| model.owner.clone())
-                    .collect::<Vec<_>>(),
-            );
-        self.owners.clone()
+        Some(
+            models
+                .iter()
+                .unique_by(|model| &model.owner)
+                .clone()
+                .map(|model| model.owner.clone())
+                .sorted_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()))
+                .collect::<Vec<_>>(),
+        )
     }
 
-    pub fn get_owners_cached(&mut self) -> Option<Vec<String>> {
-        match &self.owners {
-            Some(owners) => Some(owners.clone()),
-            None => self.get_owners(),
-        }
+    pub fn get_tags(&self) -> Option<Vec<String>> {
+        let models = self.models.as_ref()?;
+        Some(
+            models
+                .iter()
+                .map(|model| &model.tags)
+                .flatten()
+                .unique()
+                .cloned()
+                .sorted_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()))
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    pub fn models_by_tag(
+        &self,
+        models: Option<&Vec<FuelModel>>,
+        tag: &str,
+    ) -> Option<Vec<FuelModel>> {
+        let models = models.or_else(|| self.models.as_ref())?;
+        Some(
+            models
+                .iter()
+                .filter(|model| model.tags.contains(&tag.to_owned()))
+                .cloned()
+                .collect::<Vec<_>>(),
+        )
     }
 }
 
 // TODO(luca) decide which fields we should skip to save on memory footprint
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct FuelModel {
     #[serde(rename = "createdAt")]
     pub created_at: String,
