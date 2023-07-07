@@ -105,7 +105,7 @@ impl FuelClient {
         models: Option<&Vec<FuelModel>>,
         owner: &str,
     ) -> Option<Vec<FuelModel>> {
-        let models = models.or_else(|| self.models.as_ref())?;
+        let models = models.or(self.models.as_ref())?;
         Some(
             models
                 .iter()
@@ -133,8 +133,7 @@ impl FuelClient {
         Some(
             models
                 .iter()
-                .map(|model| &model.tags)
-                .flatten()
+                .flat_map(|model| &model.tags)
                 .unique()
                 .cloned()
                 .sorted_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()))
@@ -147,7 +146,7 @@ impl FuelClient {
         models: Option<&Vec<FuelModel>>,
         tag: &str,
     ) -> Option<Vec<FuelModel>> {
-        let models = models.or_else(|| self.models.as_ref())?;
+        let models = models.or(self.models.as_ref())?;
         Some(
             models
                 .iter()
