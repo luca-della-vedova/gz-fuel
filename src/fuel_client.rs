@@ -11,6 +11,7 @@ pub struct FuelClient {
     pub url: String,
     pub cache_path: PathBuf,
     pub models: Option<Vec<FuelModel>>,
+    pub token: Option<String>,
 }
 
 impl Default for FuelClient {
@@ -22,11 +23,17 @@ impl Default for FuelClient {
                 .ok()
                 .and_then(|b| serde_json::de::from_slice::<Vec<FuelModel>>(&b).ok()),
             cache_path,
+            token: None,
         }
     }
 }
 
 impl FuelClient {
+    pub fn with_token(mut self, token: &str) -> Self {
+        self.token = Some(token.to_owned());
+        self
+    }
+
     async fn build_cache(&self) -> Option<Vec<FuelModel>> {
         println!("Building cache");
         let mut page = 1;
@@ -34,7 +41,11 @@ impl FuelClient {
         let models = loop {
             let url = self.url.clone() + "models" + "?page=" + &page.to_string();
             println!("Requesting page {}", page);
-            let Ok(res) = surf::get(url.clone())
+            let mut req = surf::get(url.clone());
+            if let Some(token) = &self.token {
+                req = req.header("Private-token", token.clone());
+            }
+            let Ok(res) = req
                 .recv_string()
                 .await else {
                 break models;
