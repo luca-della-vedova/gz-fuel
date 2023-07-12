@@ -139,6 +139,21 @@ impl FuelClient {
         )
     }
 
+    pub fn models_by_private(
+        &self,
+        models: Option<&Vec<FuelModel>>,
+        private: bool,
+    ) -> Option<Vec<FuelModel>> {
+        let models = models.or(self.models.as_ref())?;
+        Some(
+            models
+                .iter()
+                .filter(|model| model.private == private)
+                .cloned()
+                .collect::<Vec<_>>(),
+        )
+    }
+
     pub fn get_tags(&self) -> Option<Vec<String>> {
         let models = self.models.as_ref()?;
         Some(
