@@ -35,12 +35,10 @@ impl FuelClient {
     }
 
     async fn build_cache(&self) -> Option<Vec<FuelModel>> {
-        println!("Building cache");
         let mut page = 1;
         let mut models = Vec::new();
         let models = loop {
             let url = self.url.clone() + "models" + "?page=" + &page.to_string();
-            println!("Requesting page {}", page);
             let mut req = surf::get(url.clone());
             if let Some(token) = &self.token {
                 req = req.header("Private-token", token.clone());
