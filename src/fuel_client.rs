@@ -16,12 +16,13 @@ pub struct FuelClient {
 
 impl Default for FuelClient {
     fn default() -> Self {
-        Self {
+        let client = Self {
             url: "https://fuel.gazebosim.org/1.0/".into(),
-            models: None,
             cache_path: None,
+            models: None,
             token: None,
-        }
+        };
+        client.with_cache(None)
     }
 }
 
