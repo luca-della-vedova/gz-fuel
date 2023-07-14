@@ -9,28 +9,30 @@ use std::time::{Duration, SystemTime};
 #[derive(Clone)]
 pub struct FuelClient {
     pub url: String,
-    pub cache_path: PathBuf,
+    pub cache_path: Option<PathBuf>,
     pub models: Option<Vec<FuelModel>>,
     pub token: Option<String>,
 }
 
 impl Default for FuelClient {
     fn default() -> Self {
-        let cache_path = Self::default_cache_path();
         Self {
             url: "https://fuel.gazebosim.org/1.0/".into(),
-            models: fs::read(&cache_path)
-                .ok()
-                .and_then(|b| serde_json::de::from_slice::<Vec<FuelModel>>(&b).ok()),
-            cache_path,
+            models: None,
+            cache_path: None,
             token: None,
         }
     }
 }
 
 impl FuelClient {
-    pub fn with_token(mut self, token: &str) -> Self {
-        self.token = Some(token.to_owned());
+    pub fn with_cache(mut self, path: Option<PathBuf>) -> Self {
+        if let Some(path) = path.or_else(Self::default_cache_path) {
+            self.models = fs::read(&path)
+                .ok()
+                .and_then(|b| serde_json::de::from_slice::<Vec<FuelModel>>(&b).ok());
+            self.cache_path = Some(path);
+        }
         self
     }
 
@@ -61,16 +63,16 @@ impl FuelClient {
         }
     }
 
-    fn default_cache_path() -> PathBuf {
-        let mut p = dirs::cache_dir().unwrap();
+    fn default_cache_path() -> Option<PathBuf> {
+        let mut p = dirs::cache_dir()?;
         p.push("open-robotics");
         p.push("gz-fuel");
         p.push("model_cache.json");
-        p
+        Some(p)
     }
 
     fn last_updated(&self) -> Option<SystemTime> {
-        let path = self.cache_path.clone();
+        let path = self.cache_path.clone()?;
         let cache_file = std::fs::File::open(path).ok()?;
         let metadata = cache_file.metadata().ok()?;
         metadata.modified().ok()
@@ -91,21 +93,23 @@ impl FuelClient {
     }
 
     /// Returns Some if cache writing was successful, None otherwise
-    pub async fn update_cache(&mut self) -> Option<()> {
+    pub async fn update_cache(&mut self, write_to_disk: bool) -> Option<Vec<FuelModel>> {
         if let Some(models) = self.build_cache().await {
             self.models = Some(models);
-            let path = self.cache_path.clone();
-            fs::create_dir_all(path.parent()?).ok()?;
-            let bytes = serde_json::ser::to_string_pretty(&self.models).ok()?;
-            fs::write(path, bytes).ok()?;
-            Some(())
+            if write_to_disk {
+                let path = self.cache_path.clone().or_else(Self::default_cache_path)?;
+                fs::create_dir_all(path.parent()?).ok()?;
+                let bytes = serde_json::ser::to_string_pretty(&self.models).ok()?;
+                fs::write(path, bytes).ok()?;
+            }
+            self.models.clone()
         } else {
             None
         }
     }
 
-    pub fn update_cache_blocking(&mut self) -> Option<()> {
-        future::block_on(self.update_cache())
+    pub fn update_cache_blocking(&mut self, write_to_disk: bool) -> Option<Vec<FuelModel>> {
+        future::block_on(self.update_cache(write_to_disk))
     }
 
     // Filtering functions, return cache filtered based on criteria

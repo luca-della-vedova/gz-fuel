@@ -7,6 +7,6 @@ fn main() {
     let should_update = client.should_update_cache(&Some(Duration::from_secs(100000)));
     dbg!(&should_update);
     if should_update {
-        client.update_cache_blocking();
+        client.update_cache_blocking(true);
     }
 }
