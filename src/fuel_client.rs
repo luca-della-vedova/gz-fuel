@@ -48,13 +48,17 @@ impl FuelClient {
         let mut models = Vec::new();
         let models = loop {
             let url = self.url.clone() + "models" + "?page=" + &page.to_string();
-            let mut req = surf::get(url.clone());
+            let mut req = ehttp::Request::get(url.clone());
             if let Some(token) = &self.token {
-                req = req.header("Private-token", token.clone());
+                req.headers
+                    .headers
+                    .push(("Private-token".to_owned(), token.clone()));
             }
-            let Ok(res) = req
-                .recv_string()
-                .await else {
+            let Some(res) = ehttp::fetch_async(req)
+                .await
+                .ok()
+                .and_then(|res| String::from_utf8(res.bytes).ok())
+            else {
                 break models;
             };
             let Ok(mut fetched_models) = serde_json::de::from_str::<Vec<FuelModel>>(&res) else {
