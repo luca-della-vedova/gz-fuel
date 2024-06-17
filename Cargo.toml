@@ -12,3 +12,4 @@ serde_json = "*"
 dirs = "*"
 itertools = "*"
 ehttp = { version = "0.4", features = ["native-async"] }
+crossbeam-channel = "*"

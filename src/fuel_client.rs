@@ -5,8 +5,8 @@ use std::{
     fs,
     path::PathBuf,
     time::{Duration, SystemTime},
-    sync::mpsc::Sender,
 };
+use crossbeam_channel::Sender;
 
 // TODO(luca) clone can be unsafe if two instances try to write to the same file
 #[derive(Clone)]
