@@ -1,9 +1,12 @@
 use futures_lite::future;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use std::{
+    fs,
+    path::PathBuf,
+    time::{Duration, SystemTime},
+};
+use crossbeam_channel::Sender;
 
 // TODO(luca) clone can be unsafe if two instances try to write to the same file
 #[derive(Clone)]
@@ -37,11 +40,14 @@ impl FuelClient {
         self
     }
 
-    async fn build_cache(&self) -> Option<Vec<FuelModel>> {
+    async fn build_cache(
+        &self,
+        progress: Option<Sender<FuelModel>>,
+    ) -> Option<Vec<FuelModel>> {
         let mut page = 1;
         let mut models = Vec::new();
         let models = loop {
-            let url = self.url.clone() + "models" + "?page=" + &page.to_string();
+            let url = format!("{}models?page={page}&per_page=100", self.url);
             let mut req = ehttp::Request::get(url.clone());
             if let Some(token) = &self.token {
                 req.headers
@@ -58,6 +64,11 @@ impl FuelClient {
             let Ok(mut fetched_models) = serde_json::de::from_str::<Vec<FuelModel>>(&res) else {
                 break models;
             };
+            if let Some(progress) = &progress {
+                for model in &fetched_models {
+                    progress.send(model.clone()).ok();
+                }
+            }
             models.append(&mut fetched_models);
             page += 1;
         };
@@ -99,7 +110,15 @@ impl FuelClient {
 
     /// Returns Some if cache writing was successful, None otherwise
     pub async fn update_cache(&mut self, write_to_disk: bool) -> Option<Vec<FuelModel>> {
-        if let Some(models) = self.build_cache().await {
+        self.update_cache_with_progress(write_to_disk, None).await
+    }
+
+    pub async fn update_cache_with_progress(
+        &mut self,
+        write_to_disk: bool,
+        progress: Option<Sender<FuelModel>>,
+    ) -> Option<Vec<FuelModel>> {
+        if let Some(models) = self.build_cache(progress).await {
             self.models = Some(models);
             if write_to_disk {
                 let path = self.cache_path.clone().or_else(Self::default_cache_path)?;
