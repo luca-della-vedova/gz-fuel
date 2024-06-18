@@ -47,7 +47,7 @@ impl FuelClient {
         let mut page = 1;
         let mut models = Vec::new();
         let models = loop {
-            let url = self.url.clone() + "models" + "?page=" + &page.to_string();
+            let url = format!("{}models?page={page}&per_page=100", self.url);
             let mut req = ehttp::Request::get(url.clone());
             if let Some(token) = &self.token {
                 req.headers
